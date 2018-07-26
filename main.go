@@ -1,36 +1,32 @@
 package main
 
 import (
-	"log"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
-	"flag"
+	"log"
 )
 
-type handle struct {
-	reverseProxy string
+var cmd Cmd
+var srv http.Server
+
+func StartServer(bind string, remote string)  {
+	log.Printf("Listening on %s, forwarding to %s", bind, remote)
+	h := &handle{reverseProxy: remote}
+	srv.Addr = bind
+	srv.Handler = h
+	//go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			log.Fatalln("ListenAndServe: ", err)
+		}
+	//}()
 }
 
-func (this *handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	remote, err := url.Parse(this.reverseProxy)
-	if err != nil {
-		log.Fatalln(err)
+func StopServer()  {
+	if err := srv.Shutdown(nil) ; err != nil {
+		log.Println(err)
 	}
-	proxy := httputil.NewSingleHostReverseProxy(remote)
-	r.Host = remote.Host
-	proxy.ServeHTTP(w, r)
-	log.Println(r.RemoteAddr + " " + r.Method + " " + r.URL.String() + " " + r.Proto + " " + r.UserAgent())
 }
 
 func main() {
-	bind := flag.String("l", "0.0.0.0:8888", "listen on ip:port")
-	remote := flag.String("r", "http://idea.lanyus.com:80", "reverse proxy addr")
-	flag.Parse()
-	log.Printf("Listening on %s, forwarding to %s", *bind, *remote)
-	h := &handle{reverseProxy: *remote}
-	err := http.ListenAndServe(*bind, h)
-	if err != nil {
-		log.Fatalln("ListenAndServe: ", err)
-	}
+	cmd = parseCmd()
+	StartServer(cmd.bind, cmd.remote)
 }
